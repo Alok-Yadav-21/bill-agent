@@ -1,0 +1,9 @@
+{
+  "name": "Bill Agent - ai assistant",
+  "meta": {
+    "description": "Scaffold. Follows the same rule as the others: n8n calls the backend's secure APIs; the backend/database remains the source of truth. See docs/n8n.md.",
+    "requiredEnv": ["N8N_API_KEY", "APP_BASE_URL"]
+  },
+  "nodes": [],
+  "connections": {}
+}

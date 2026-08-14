@@ -1,0 +1,211 @@
+// PostgreSQL is the source of truth for all financial data.
+// Money is stored ONLY as Int (minor units, e.g. pence). No floats/decimals.
+// No `remaining_budget` column exists anywhere: remaining is always DERIVED.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  ADMIN
+  MEMBER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INVITED
+  REMOVED
+}
+
+enum BudgetPeriodType {
+  MONTHLY
+  WEEKLY
+  CUSTOM
+}
+
+enum ExpenseSource {
+  MANUAL
+  RECEIPT
+  AI
+}
+
+enum ExpenseStatus {
+  CONFIRMED
+  PENDING
+  CANCELLED
+}
+
+enum ReceiptStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  avatarUrl    String?
+  passwordHash String? // null when using an external auth provider
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships     HouseholdMember[]
+  expenses        Expense[]
+  uploadedReceipts Receipt[]        @relation("ReceiptUploader")
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@index([email])
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdBy String
+  currency  String   @default("GBP") // ISO 4217; per-household so multi-currency is possible later
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members    HouseholdMember[]
+  budgets    Budget[]
+  expenses   Expense[]
+  categories ExpenseCategory[]
+  receipts   Receipt[]
+  notifications Notification[]
+  auditLogs  AuditLog[]
+}
+
+// Join table: a household has ANY number of members. No hardcoded cap.
+model HouseholdMember {
+  id          String       @id @default(cuid())
+  householdId String
+  userId      String
+  role        MemberRole   @default(MEMBER)
+  status      MemberStatus @default(ACTIVE)
+  joinedAt    DateTime     @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId]) // a user joins a household at most once
+  @@index([householdId])
+  @@index([userId])
+}
+
+model Budget {
+  id          String           @id @default(cuid())
+  householdId String
+  amountMinor Int // integer minor units, never a float
+  currency    String           @default("GBP")
+  periodType  BudgetPeriodType @default(MONTHLY)
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, startDate, endDate])
+}
+
+model ExpenseCategory {
+  id          String   @id @default(cuid())
+  householdId String? // null => global/default category available to all households
+  name        String
+  icon        String?
+  createdAt   DateTime @default(now())
+
+  household Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  expenses  Expense[]
+
+  @@unique([householdId, name])
+  @@index([householdId])
+}
+
+model Expense {
+  id           String        @id @default(cuid())
+  householdId  String
+  userId       String
+  categoryId   String?
+  amountMinor  Int // integer minor units, CHECK amountMinor > 0 enforced via migration
+  currency     String        @default("GBP")
+  merchant     String?
+  description  String?
+  purchaseDate DateTime
+  source       ExpenseSource @default(MANUAL)
+  status       ExpenseStatus @default(CONFIRMED)
+  receiptId    String?       @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  household Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category  ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  receipt   Receipt?         @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+
+  // Composite indexes tuned for the dashboard aggregation queries.
+  @@index([householdId, status, purchaseDate])
+  @@index([householdId, userId])
+  @@index([householdId, categoryId])
+}
+
+model Receipt {
+  id               String        @id @default(cuid())
+  householdId      String
+  uploadedBy       String
+  fileUrl          String
+  fileHash         String? // sha256 of bytes, for duplicate detection
+  merchant         String?
+  receiptDate      DateTime?
+  totalMinor       Int?
+  taxMinor         Int?
+  processingStatus ReceiptStatus @default(UPLOADED)
+  extractedData    Json? // raw structured output from the AI/OCR provider
+  createdAt        DateTime      @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  uploader  User      @relation("ReceiptUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
+  expense   Expense?
+
+  @@index([householdId, fileHash]) // fast duplicate lookups
+  @@index([householdId, uploadedBy])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  householdId String
+  userId      String?   // null => household-wide
+  type        String
+  title       String
+  message     String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, userId, readAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  householdId String
+  userId      String?
+  action      String // e.g. "expense.create", "budget.update"
+  entityType  String
+  entityId    String
+  metadata    Json? // { oldValue, newValue, ... }
+  createdAt   DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, createdAt])
+}

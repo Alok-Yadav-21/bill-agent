@@ -1,0 +1,62 @@
+{
+  "name": "Bill Agent - Budget Monitoring",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] } },
+      "id": "cron",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.APP_BASE_URL}}/api/internal/budget-status",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-api-key", "value": "={{$env.N8N_API_KEY}}" }] }
+      },
+      "id": "fetch",
+      "name": "Get Budget Status (backend)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The backend already computed percentUsed and any crossed threshold.\n// n8n only decides whether to notify - it never computes the money itself.\nreturn items.filter(i => i.json.alert).map(i => ({ json: { householdId: i.json.householdId, message: i.json.alert.message } }));"
+      },
+      "id": "filter",
+      "name": "Only Households With Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.APP_BASE_URL}}/api/internal/notifications",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-api-key", "value": "={{$env.N8N_API_KEY}}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"householdId\": \"{{$json.householdId}}\", \"message\": \"{{$json.message}}\" }"
+      },
+      "id": "notify",
+      "name": "Create Notification (backend)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Schedule": { "main": [[{ "node": "Get Budget Status (backend)", "type": "main", "index": 0 }]] },
+    "Get Budget Status (backend)": { "main": [[{ "node": "Only Households With Alerts", "type": "main", "index": 0 }]] },
+    "Only Households With Alerts": { "main": [[{ "node": "Create Notification (backend)", "type": "main", "index": 0 }]] }
+  },
+  "settings": {},
+  "meta": {
+    "description": "Scheduled monitor. Reads authoritative figures FROM the backend and asks the backend to create notifications. Contains no financial math.",
+    "requiredEnv": ["N8N_API_KEY", "APP_BASE_URL"]
+  }
+}

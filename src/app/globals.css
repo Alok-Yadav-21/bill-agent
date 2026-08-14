@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --border: #e6e8ec;
+  --ink: #101828;
+  --muted: #667085;
+  --accent: #1f6f5c;      /* considered, calm green — trust over flash */
+  --accent-weak: #e7f2ee;
+  --warn: #b54708;
+  --danger: #b42318;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Money should always align and read as data. */
+.tabular { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
