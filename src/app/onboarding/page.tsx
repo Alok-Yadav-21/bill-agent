@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface PendingInvite {
@@ -9,7 +9,9 @@ interface PendingInvite {
   role: "ADMIN" | "MEMBER";
 }
 
-export default function OnboardingPage() {
+export const dynamic = "force-dynamic";
+
+function OnboardingInner() {
   const router = useRouter();
   const params = useSearchParams();
   const tokenFromLink = params.get("token");
@@ -176,5 +178,13 @@ export default function OnboardingPage() {
         <p className="mt-3 text-xs text-[var(--muted)]">You'll be the admin and can invite members afterwards.</p>
       </section>
     </div>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingInner />
+    </Suspense>
   );
 }
