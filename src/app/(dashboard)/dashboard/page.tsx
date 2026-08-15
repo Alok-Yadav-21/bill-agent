@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useHousehold } from "@/lib/household-context";
 
 interface DashboardData {
   configured: boolean;
@@ -19,14 +20,15 @@ interface DashboardData {
 }
 
 // Wire this to the user's selected household (session/context) in a later pass.
-const HOUSEHOLD_ID = process.env.NEXT_PUBLIC_DEMO_HOUSEHOLD_ID ?? "";
-
 export default function DashboardPage() {
+  const { current } = useHousehold();
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
   const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    fetch(`/api/dashboard?householdId=${HOUSEHOLD_ID}`)
+    if (!current) return; // wait for household context
+    setState("loading");
+    fetch(`/api/dashboard?householdId=${current.id}`)
       .then((r) => r.json())
       .then((json) => {
         if (!json.ok) throw new Error(json.error?.message ?? "Failed");
@@ -34,7 +36,7 @@ export default function DashboardPage() {
         setState("ready");
       })
       .catch(() => setState("error"));
-  }, []);
+  }, [current]);
 
   if (state === "loading") return <Skeleton />;
   if (state === "error")

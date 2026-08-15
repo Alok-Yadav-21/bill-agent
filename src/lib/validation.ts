@@ -29,6 +29,20 @@ export const setBudgetSchema = z.object({
   endDate: z.coerce.date(),
 });
 
+/** Edit an existing budget in place. All fields optional; amount still > 0. */
+export const updateBudgetSchema = z
+  .object({
+    budgetId: z.string().cuid(),
+    amount: moneyMajor.optional(),
+    periodType: z.enum(["MONTHLY", "WEEKLY", "CUSTOM"]).optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+  })
+  .refine(
+    (v) => v.amount !== undefined || v.periodType || v.startDate || v.endDate,
+    { message: "Provide at least one field to update" },
+  );
+
 export const aiQuerySchema = z.object({
   message: z.string().min(1).max(500),
 });
@@ -40,4 +54,27 @@ export const confirmReceiptSchema = z.object({
   categoryId: z.string().cuid().optional().nullable(),
   purchaseDate: z.coerce.date().optional(),
   forceCreate: z.boolean().optional(), // override duplicate warning
+});
+
+export const createHouseholdSchema = z.object({
+  name: z.string().min(1).max(120),
+  currency: z.enum(["GBP", "USD", "EUR"]).default("GBP"),
+  // Optional first budget created together with the household.
+  budget: z
+    .object({
+      amount: moneyMajor,
+      periodType: z.enum(["MONTHLY", "WEEKLY", "CUSTOM"]).default("MONTHLY"),
+      startDate: z.coerce.date(),
+      endDate: z.coerce.date(),
+    })
+    .optional(),
+});
+
+export const createInvitationSchema = z.object({
+  email: z.string().email().max(200),
+  role: z.enum(["ADMIN", "MEMBER"]).default("MEMBER"),
+});
+
+export const acceptInvitationSchema = z.object({
+  token: z.string().min(10).max(200),
 });

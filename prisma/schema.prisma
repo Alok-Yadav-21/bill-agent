@@ -7,8 +7,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Runtime uses the pooled connection (PgBouncer) — required on serverless.
+  url       = env("DATABASE_URL")
+  // Migrations use a direct connection. Falls back to DATABASE_URL locally.
+  directUrl = env("DIRECT_URL")
 }
 
 enum MemberRole {
@@ -20,6 +23,13 @@ enum MemberStatus {
   ACTIVE
   INVITED
   REMOVED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
 }
 
 enum BudgetPeriodType {
@@ -49,16 +59,21 @@ enum ReceiptStatus {
 
 model User {
   id           String   @id @default(cuid())
+  // Maps to the Supabase auth user id (auth.users.id). Nullable so dev-seeded
+  // users without an auth account are allowed; unique so each auth user links
+  // to exactly one app user. Postgres treats multiple NULLs as distinct.
+  authId       String?  @unique
   name         String
   email        String   @unique
   avatarUrl    String?
-  passwordHash String? // null when using an external auth provider
+  passwordHash String? // null when using an external auth provider (Supabase)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   memberships     HouseholdMember[]
   expenses        Expense[]
   uploadedReceipts Receipt[]        @relation("ReceiptUploader")
+  invitationsSent Invitation[]     @relation("InvitationInviter")
   notifications   Notification[]
   auditLogs       AuditLog[]
 
@@ -78,6 +93,7 @@ model Household {
   expenses   Expense[]
   categories ExpenseCategory[]
   receipts   Receipt[]
+  invitations Invitation[]
   notifications Notification[]
   auditLogs  AuditLog[]
 }
@@ -176,6 +192,25 @@ model Receipt {
 
   @@index([householdId, fileHash]) // fast duplicate lookups
   @@index([householdId, uploadedBy])
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  householdId String
+  email       String // the email the admin invited; normalised lower-case
+  role        MemberRole       @default(MEMBER)
+  token       String           @unique // random; used to redeem the invite
+  invitedBy   String
+  status      InvitationStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  inviter   User      @relation("InvitationInviter", fields: [invitedBy], references: [id], onDelete: Cascade)
+
+  @@index([householdId, status])
+  @@index([email, status])
 }
 
 model Notification {

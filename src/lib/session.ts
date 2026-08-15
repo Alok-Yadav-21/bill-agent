@@ -1,32 +1,35 @@
 import { fail } from "./api-response";
+import { createSupabaseServerClient } from "./supabase/server";
+import { getOrCreateUserFromAuth } from "@/server/services/user-service";
 
 export interface SessionUser {
-  id: string;
+  id: string; // internal User.id (source of truth), NOT the Supabase auth id
   email: string;
   name: string;
 }
 
 /**
- * Resolves the authenticated user for a request.
+ * Resolves the authenticated user for the current request.
  *
- * AUTH INTEGRATION POINT: wire this to your provider (Supabase Auth, Auth.js,
- * Clerk, etc.). It must derive identity from a verified, server-side session or
- * JWT — NEVER from a client-supplied user id or header. The rest of the app
- * treats the returned id as trusted precisely because this function verified it.
+ * Identity is derived from the verified Supabase session cookie (via
+ * supabase.auth.getUser(), which validates the JWT server-side) — never from a
+ * client-supplied id or header. The auth user is then mapped to our internal
+ * User row so the rest of the app deals only in trusted internal ids.
  */
-export async function getSessionUser(req: Request): Promise<SessionUser | null> {
-  // TODO: replace with real verification, e.g. Supabase:
-  //   const { data } = await supabaseServer(req).auth.getUser();
-  //   return data.user ? { id: data.user.id, email: ..., name: ... } : null;
-  void req;
-  return null;
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const dbUser = await getOrCreateUserFromAuth(user);
+  return { id: dbUser.id, email: dbUser.email, name: dbUser.name };
 }
 
-/** Convenience: return the user or a 401 Response to short-circuit a handler. */
-export async function requireUser(
-  req: Request,
-): Promise<SessionUser | Response> {
-  const user = await getSessionUser(req);
+/** Return the user, or a 401 Response the handler can return to short-circuit. */
+export async function requireUser(): Promise<SessionUser | Response> {
+  const user = await getSessionUser();
   if (!user) return fail("UNAUTHENTICATED", "You must be signed in.", 401);
   return user;
 }

@@ -80,14 +80,16 @@ The suite in `tests/budget.test.ts` verifies the acceptance scenario directly:
 
 ## Build status (honest)
 
-**Done and verified:** money engine, budget/derivation engine (+ passing tests),
+**Done and verified:** Supabase Auth wired end-to-end (login/register/logout,
+session middleware, auth→User mapping with passing mapper tests), money engine,
+budget/derivation engine (+ passing tests),
 Prisma schema, service abstractions (receipt + AI), authz guard, transactional
 expense service with audit + threshold notifications, core API routes
 (`expenses`, `expenses/:id`, `budget`, `dashboard`, `ai/query`,
 `receipts/process`, `receipts/confirm`), duplicate detection, dashboard UI,
 seed, n8n receipt + budget-monitor workflows, docs.
 
-**Scaffolded / next milestones:** real auth wiring, object storage for receipt
+**Scaffolded / next milestones:** object storage for receipt
 files, remaining UI pages (expenses table, scan, members, categories, reports,
 assistant chat), the internal `/api/internal/*` endpoints n8n calls, the
 remaining n8n workflow bodies, invitations, and CI. See `docs/architecture.md`

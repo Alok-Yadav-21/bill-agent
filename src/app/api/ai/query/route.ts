@@ -7,7 +7,7 @@ import { getAiAssistant } from "@/server/services/ai";
 
 export async function POST(req: Request) {
   return guarded(async () => {
-    const user = await requireUser(req);
+    const user = await requireUser();
     if (user instanceof Response) return user;
     const householdId = householdIdFrom(req);
     if (!householdId) return fail("BAD_REQUEST", "householdId is required");
