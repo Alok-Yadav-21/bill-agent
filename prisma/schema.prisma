@@ -16,7 +16,24 @@ datasource db {
 
 enum MemberRole {
   ADMIN
+  MANAGER
   MEMBER
+}
+
+// A general financial ledger entry. The household's available balance is always
+// derived from CONFIRMED transactions — never stored.
+enum TransactionType {
+  CONTRIBUTION // member adds money into the household pot (money in)
+  EXPENSE      // money spent (money out)
+  TRANSFER     // money moved between two members (net zero to household)
+  REFUND       // money returned into the pot (money in)
+  ADJUSTMENT   // manual correction; direction set by isCredit
+}
+
+enum TransactionStatus {
+  CONFIRMED // counts toward the balance
+  PENDING   // awaiting approval; does not count
+  VOID      // reversed; kept for the record, does not count
 }
 
 enum MemberStatus {
@@ -72,6 +89,8 @@ model User {
 
   memberships     HouseholdMember[]
   expenses        Expense[]
+  transactions    Transaction[]    @relation("TxnActor")
+  transactionsReceived Transaction[] @relation("TxnCounterparty")
   uploadedReceipts Receipt[]        @relation("ReceiptUploader")
   invitationsSent Invitation[]     @relation("InvitationInviter")
   notifications   Notification[]
@@ -91,6 +110,7 @@ model Household {
   members    HouseholdMember[]
   budgets    Budget[]
   expenses   Expense[]
+  transactions Transaction[]
   categories ExpenseCategory[]
   receipts   Receipt[]
   invitations Invitation[]
@@ -140,6 +160,7 @@ model ExpenseCategory {
 
   household Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
   expenses  Expense[]
+  transactions Transaction[]
 
   @@unique([householdId, name])
   @@index([householdId])
@@ -189,6 +210,7 @@ model Receipt {
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
   uploader  User      @relation("ReceiptUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
   expense   Expense?
+  transaction Transaction? @relation("ReceiptTransaction")
 
   @@index([householdId, fileHash]) // fast duplicate lookups
   @@index([householdId, uploadedBy])
@@ -211,6 +233,38 @@ model Invitation {
 
   @@index([householdId, status])
   @@index([email, status])
+}
+
+model Transaction {
+  id                 String            @id @default(cuid())
+  householdId        String
+  userId             String // the member the transaction is attributed to (payer/contributor)
+  counterpartyUserId String? // for TRANSFER: the receiving member
+  categoryId         String?
+  type               TransactionType
+  status             TransactionStatus @default(CONFIRMED)
+  amountMinor        Int // ALWAYS positive integer minor units; direction derives from type
+  isCredit           Boolean           @default(true) // only meaningful for ADJUSTMENT (+/-)
+  currency           String            @default("GBP")
+  merchant           String?
+  description        String?
+  occurredAt         DateTime // when the money moved (user-facing date)
+  source             ExpenseSource     @default(MANUAL)
+  receiptId          String?           @unique
+  voidReason         String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  household    Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user         User             @relation("TxnActor", fields: [userId], references: [id], onDelete: Restrict)
+  counterparty User?            @relation("TxnCounterparty", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+  category     ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  receipt      Receipt?         @relation("ReceiptTransaction", fields: [receiptId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, status, occurredAt])
+  @@index([householdId, type, status])
+  @@index([householdId, userId])
+  @@index([householdId, categoryId])
 }
 
 model Notification {

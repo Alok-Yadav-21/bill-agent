@@ -78,3 +78,38 @@ export const createInvitationSchema = z.object({
 export const acceptInvitationSchema = z.object({
   token: z.string().min(10).max(200),
 });
+
+export const txnTypeEnum = z.enum(["CONTRIBUTION", "EXPENSE", "TRANSFER", "REFUND", "ADJUSTMENT"]);
+
+export const createTransactionSchema = z
+  .object({
+    type: txnTypeEnum,
+    amount: moneyMajor,
+    isCredit: z.boolean().optional(), // ADJUSTMENT direction
+    merchant: z.string().max(200).optional(),
+    description: z.string().max(1000).optional(),
+    categoryId: z.string().cuid().optional().nullable(),
+    counterpartyUserId: z.string().cuid().optional().nullable(), // TRANSFER recipient
+    occurredAt: z.coerce.date().optional(),
+    onBehalfOfUserId: z.string().cuid().optional().nullable(), // admin/manager attributing to a member
+  })
+  .refine((v) => v.type !== "TRANSFER" || !!v.counterpartyUserId, {
+    message: "A transfer needs a recipient member.",
+    path: ["counterpartyUserId"],
+  });
+
+export const updateTransactionSchema = z.object({
+  amount: moneyMajor.optional(),
+  merchant: z.string().max(200).optional(),
+  description: z.string().max(1000).optional(),
+  categoryId: z.string().cuid().optional().nullable(),
+  occurredAt: z.coerce.date().optional(),
+});
+
+export const voidTransactionSchema = z.object({
+  reason: z.string().min(1).max(300),
+});
+
+export const resetHouseholdSchema = z.object({
+  confirm: z.string().min(1), // must equal the household name
+});

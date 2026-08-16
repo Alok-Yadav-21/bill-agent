@@ -3,7 +3,8 @@ import { householdIdFrom } from "@/lib/request";
 import { ok, fail, guarded } from "@/lib/api-response";
 import { requireMembership, ForbiddenError } from "@/lib/authz";
 import { prisma } from "@/lib/db";
-import { summariseBudget, spendByMember, spendByCategory, evaluateBudgetAlert, type ExpenseLike } from "@/lib/budget";
+import { summariseLedger, ledgerByMember, ledgerByCategory, type LedgerEntry } from "@/lib/ledger";
+import { evaluateBudgetAlert } from "@/lib/budget";
 import { formatMoney } from "@/lib/money";
 
 export async function GET(req: Request) {
@@ -12,7 +13,6 @@ export async function GET(req: Request) {
     if (user instanceof Response) return user;
     const householdId = householdIdFrom(req);
     if (!householdId) return fail("BAD_REQUEST", "householdId is required");
-
     try {
       await requireMembership(user.id, householdId);
     } catch (err) {
@@ -20,33 +20,47 @@ export async function GET(req: Request) {
       throw err;
     }
 
-    const [budget, expenses] = await Promise.all([
+    const [budget, rows] = await Promise.all([
       prisma.budget.findFirst({ where: { householdId }, orderBy: { startDate: "desc" } }),
-      prisma.expense.findMany({
+      prisma.transaction.findMany({
         where: { householdId, status: "CONFIRMED" },
-        select: { amountMinor: true, status: true, userId: true, categoryId: true, purchaseDate: true },
+        select: {
+          amountMinor: true, isCredit: true, type: true, status: true,
+          userId: true, counterpartyUserId: true, categoryId: true, occurredAt: true,
+        },
       }),
     ]);
 
-    if (!budget) return ok({ configured: false });
+    const ledger = summariseLedger(rows as unknown as LedgerEntry[]);
 
-    const summary = summariseBudget(budget.amountMinor, expenses as ExpenseLike[]);
-    const alert = evaluateBudgetAlert(summary.percentUsed);
+    // Budget is an optional monthly target; usage is measured against expenses.
+    let budgetBlock = null;
+    let alert = null;
+    if (budget && budget.amountMinor > 0) {
+      const percentUsed = Number(((ledger.totalExpensesMinor / budget.amountMinor) * 100).toFixed(2));
+      alert = evaluateBudgetAlert(percentUsed);
+      budgetBlock = {
+        total: formatMoney(budget.amountMinor),
+        spent: formatMoney(ledger.totalExpensesMinor),
+        percentUsed,
+        overBudget: ledger.totalExpensesMinor > budget.amountMinor,
+      };
+    }
 
     return ok({
       configured: true,
-      budget: {
-        total: formatMoney(summary.totalBudgetMinor),
-        spent: formatMoney(summary.totalSpentMinor),
-        remaining: formatMoney(summary.remainingMinor),
-        percentUsed: summary.percentUsed,
-        transactions: summary.transactionCount,
-        averageExpense: formatMoney(summary.averageExpenseMinor),
-        overBudget: summary.isOverBudget,
+      balance: {
+        available: formatMoney(ledger.availableBalanceMinor),
+        availableMinor: ledger.availableBalanceMinor,
+        contributions: formatMoney(ledger.totalContributionsMinor),
+        expenses: formatMoney(ledger.totalExpensesMinor),
+        transactions: ledger.transactionCount,
+        negative: ledger.availableBalanceMinor < 0,
       },
+      budget: budgetBlock,
       alert,
-      topMembers: spendByMember(expenses as ExpenseLike[]).slice(0, 5),
-      topCategories: spendByCategory(expenses as ExpenseLike[]).slice(0, 6),
+      topMembers: ledgerByMember(rows as unknown as LedgerEntry[]).slice(0, 5),
+      topCategories: ledgerByCategory(rows as unknown as LedgerEntry[]).slice(0, 6),
     });
   });
 }

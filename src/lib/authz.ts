@@ -44,3 +44,19 @@ export async function requireAdmin(
   }
   return m;
 }
+
+// --- Capability-based authorization (backend enforcement) ---
+import { can as roleCan, type Role, type Capability } from "./permissions";
+
+/** Assert the member has a capability; returns their membership for reuse. */
+export async function requireCapability(
+  userId: string,
+  householdId: string,
+  capability: Capability,
+): Promise<Membership> {
+  const m = await requireMembership(userId, householdId);
+  if (!roleCan(m.role as Role, capability)) {
+    throw new ForbiddenError("You don't have permission to do that.");
+  }
+  return m;
+}

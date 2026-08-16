@@ -5,13 +5,13 @@ import { useState } from "react";
 
 const PRIMARY = [
   { href: "/dashboard", label: "Home" },
-  { href: "/expenses", label: "Expenses" },
+  { href: "/transactions", label: "Ledger" },
   { href: "/scan", label: "Scan", accent: true },
 ];
 
 const ALL = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/expenses", label: "Expenses" },
+  { href: "/transactions", label: "Transactions" },
   { href: "/scan", label: "Scan Receipt" },
   { href: "/members", label: "Members" },
   { href: "/categories", label: "Categories" },

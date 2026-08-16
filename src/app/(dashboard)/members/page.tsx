@@ -8,9 +8,10 @@ interface Member {
   name: string;
   email: string;
   role: "ADMIN" | "MEMBER";
+  contributed: string;
   spent: string;
+  net: string;
   transactions: number;
-  percentOfHousehold: number;
 }
 
 interface PendingInvite {
@@ -134,9 +135,9 @@ export default function MembersPage() {
             <tr className="text-left text-[var(--muted)]">
               <th className="px-4 py-3 font-medium">Member</th>
               <th className="px-4 py-3 font-medium">Role</th>
+              <th className="px-4 py-3 font-medium text-right">Contributed</th>
               <th className="px-4 py-3 font-medium text-right">Spent</th>
-              <th className="px-4 py-3 font-medium text-right">Txns</th>
-              <th className="px-4 py-3 font-medium text-right">% of household</th>
+              <th className="px-4 py-3 font-medium text-right">Net</th>
             </tr>
           </thead>
           <tbody>
@@ -147,9 +148,9 @@ export default function MembersPage() {
                   <div className="text-xs text-[var(--muted)]">{m.email}</div>
                 </td>
                 <td className="px-4 py-3">{m.role === "ADMIN" ? "Admin" : "Member"}</td>
+                <td className="tabular px-4 py-3 text-right">{m.contributed}</td>
                 <td className="tabular px-4 py-3 text-right">{m.spent}</td>
-                <td className="tabular px-4 py-3 text-right">{m.transactions}</td>
-                <td className="tabular px-4 py-3 text-right">{m.percentOfHousehold}%</td>
+                <td className="tabular px-4 py-3 text-right">{m.net}</td>
               </tr>
             ))}
           </tbody>

@@ -57,7 +57,7 @@ export default function ScanPage() {
     }).then((r) => r.json());
     setBusy(false);
     if (!res.ok) { setError(res.error?.message ?? "Could not save expense."); return; }
-    setRemaining(res.data.remaining ?? null);
+    setRemaining(res.data.availableBalance ?? null);
     setStage("done");
   }
 
@@ -123,7 +123,7 @@ export default function ScanPage() {
         <div className="rounded-xl border bg-[var(--surface)] p-6 text-center" style={{ borderColor: "var(--border)" }}>
           <div className="text-3xl">✅</div>
           <p className="mt-2 text-sm font-medium">Expense added.</p>
-          {remaining && <p className="mt-1 text-sm text-[var(--muted)]">Remaining budget: {remaining}</p>}
+          {remaining && <p className="mt-1 text-sm text-[var(--muted)]">Available balance: {remaining}</p>}
           <button onClick={() => { setStage("upload"); setExtracted(null); setReceiptId(null); }} className="mt-4 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white">Scan another</button>
         </div>
       )}

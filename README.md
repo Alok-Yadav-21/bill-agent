@@ -1,5 +1,7 @@
 # Bill Agent
 
+A shared household **financial record system**: a typed transaction ledger (contributions, expenses, transfers, refunds, adjustments) where the available balance is always derived from confirmed transactions, with backend-enforced roles (Admin / Manager / Member). See `docs/ledger.md`.
+
 A shared household budget and expense manager. Multiple members record spending;
 the remaining budget is always **derived from the database**, never stored or
 edited directly. AI and n8n are optional layers that _assist_ — they are never

@@ -32,9 +32,9 @@ export class LocalRuleAssistant implements AiAssistant {
   async query(ctx: ToolContext, message: string): Promise<AiQueryResult> {
     const q = message.toLowerCase();
 
-    if (/(left|remaining|have.*left)/.test(q)) {
-      const r = await aiTools.get_remaining_budget(ctx);
-      return { answer: `You have ${("remaining" in r && r.remaining) || "no budget set"} remaining.`, references: r };
+    if (/(left|remaining|have.*left|balance|afford)/.test(q)) {
+      const r = await aiTools.get_balance(ctx);
+      return { answer: `Your available balance is ${r.availableBalance} (contributed ${r.totalContributed}, spent ${r.totalSpent}).`, references: r };
     }
     if (/(who spent|highest spender|most)/.test(q)) {
       const r = await aiTools.get_member_spending(ctx);
@@ -44,12 +44,9 @@ export class LocalRuleAssistant implements AiAssistant {
         references: r,
       };
     }
-    if (/(spent|spending|total)/.test(q)) {
-      const r = await aiTools.get_budget_status(ctx);
-      return {
-        answer: "totalSpent" in r ? `You've spent ${r.totalSpent} of ${r.totalBudget}.` : "No budget configured.",
-        references: r,
-      };
+    if (/(spent|spending|total|contributed)/.test(q)) {
+      const r = await aiTools.get_balance(ctx);
+      return { answer: `You've spent ${r.totalSpent} in total; the household has contributed ${r.totalContributed}.`, references: r };
     }
     return {
       answer:

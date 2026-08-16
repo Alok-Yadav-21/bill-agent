@@ -222,7 +222,52 @@ export default function SettingsPage() {
           keeps this one in history and begins a fresh period — your past expenses are never deleted.
         </p>
       </Panel>
+
+      <DangerZone householdId={current?.id} householdName={current?.name} isAdmin={current?.role === "ADMIN"} />
     </div>
+  );
+}
+
+function DangerZone({ householdId, householdName, isAdmin }: { householdId?: string; householdName?: string; isAdmin?: boolean }) {
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  if (!isAdmin || !householdId) return null;
+
+  async function reset() {
+    if (!confirm) return;
+    if (!window.confirm("This permanently clears all financial records for this household. Members are kept. Continue?")) return;
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch(`/api/households/reset?householdId=${householdId}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm }),
+      }).then((r) => r.json());
+      if (!res.ok) { setMsg({ kind: "err", text: res.error?.message ?? "Reset failed." }); return; }
+      setMsg({ kind: "ok", text: `Reset complete. Cleared ${res.data.transactions} transactions.` });
+      setConfirm("");
+      setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <section className="rounded-xl border p-5" style={{ borderColor: "var(--danger)" }}>
+      <h2 className="text-base font-semibold" style={{ color: "var(--danger)" }}>Danger zone</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">
+        Reset clears <strong>all transactions, budgets, receipts and custom categories</strong> for this household so you can start fresh.
+        Your household and members are kept. This cannot be undone.
+      </p>
+      <label className="mt-4 block">
+        <span className="text-sm text-[var(--muted)]">Type the household name <strong>{householdName}</strong> to confirm</span>
+        <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={householdName}
+          className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ borderColor: "var(--border)" }} />
+      </label>
+      {msg && <p className="mt-2 text-sm" style={{ color: msg.kind === "ok" ? "var(--accent)" : "var(--danger)" }}>{msg.text}</p>}
+      <button onClick={reset} disabled={busy || confirm.trim() !== householdName}
+        className="mt-4 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50" style={{ background: "var(--danger)" }}>
+        {busy ? "Resetting…" : "Reset household data"}
+      </button>
+    </section>
   );
 }
 

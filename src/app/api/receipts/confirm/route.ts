@@ -3,7 +3,7 @@ import { householdIdFrom } from "@/lib/request";
 import { ok, fail, guarded } from "@/lib/api-response";
 import { confirmReceiptSchema } from "@/lib/validation";
 import { requireMembership, ForbiddenError } from "@/lib/authz";
-import { createExpense } from "@/server/services/expense-service";
+import { createTransaction } from "@/server/services/transaction-service";
 import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 
@@ -24,27 +24,28 @@ export async function POST(req: Request) {
     const parsed = confirmReceiptSchema.safeParse(body);
     if (!parsed.success) return fail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid input", 422);
 
-    const receipt = await prisma.receipt.findFirst({
-      where: { id: parsed.data.receiptId, householdId },
-    });
+    const receipt = await prisma.receipt.findFirst({ where: { id: parsed.data.receiptId, householdId } });
     if (!receipt) return fail("NOT_FOUND", "Receipt not found", 404);
-    if (receipt.expenseId ?? (await prisma.expense.findFirst({ where: { receiptId: receipt.id } }))) {
-      return fail("ALREADY_CONFIRMED", "This receipt already has an expense.", 409);
-    }
 
-    // The expense only becomes CONFIRMED here, after explicit user confirmation.
-    const { expense, summary } = await createExpense({
+    // A receipt links to exactly one ledger transaction.
+    const already = await prisma.transaction.findFirst({ where: { receiptId: receipt.id } });
+    if (already) return fail("ALREADY_CONFIRMED", "This receipt already has a transaction.", 409);
+
+    // Scanned receipts become a CONFIRMED EXPENSE in the ledger after the user
+    // confirms — so they affect the household's available balance.
+    const { transaction, summary } = await createTransaction({
       householdId,
       actorUserId: user.id,
+      type: "EXPENSE",
       amountMajor: parsed.data.amount,
       merchant: parsed.data.merchant ?? receipt.merchant ?? undefined,
       categoryId: parsed.data.categoryId ?? null,
-      purchaseDate: parsed.data.purchaseDate ?? receipt.receiptDate ?? undefined,
+      occurredAt: parsed.data.purchaseDate ?? receipt.receiptDate ?? undefined,
       source: "RECEIPT",
       status: "CONFIRMED",
       receiptId: receipt.id,
     });
 
-    return ok({ expense, remaining: summary ? formatMoney(summary.remainingMinor) : null }, 201);
+    return ok({ transaction, availableBalance: formatMoney(summary.availableBalanceMinor) }, 201);
   });
 }

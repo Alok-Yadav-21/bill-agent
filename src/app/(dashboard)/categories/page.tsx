@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useHousehold } from "@/lib/household-context";
 
 interface Category { id: string; name: string; custom: boolean }
-interface CategorySpend { categoryId: string | null; totalMinor: number; transactionCount: number }
+interface CategorySpend { categoryId: string | null; spentMinor: number; transactionCount: number }
 
 export default function CategoriesPage() {
   const { current } = useHousehold();
@@ -26,7 +26,7 @@ export default function CategoriesPage() {
     if (dash.ok && dash.data.configured) {
       const map: Record<string, { total: number; count: number }> = {};
       (dash.data.topCategories as CategorySpend[]).forEach((c) => {
-        if (c.categoryId) map[c.categoryId] = { total: c.totalMinor, count: c.transactionCount };
+        if (c.categoryId) map[c.categoryId] = { total: c.spentMinor, count: c.transactionCount };
       });
       setSpend(map);
     }

@@ -6,12 +6,13 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 
 interface Dash {
   configured: boolean;
-  budget?: { total: string; spent: string; remaining: string; percentUsed: number };
-  topCategories?: { categoryId: string | null; totalMinor: number }[];
+  balance?: { available: string; contributions: string; expenses: string };
+  topCategories?: { categoryId: string | null; spentMinor: number }[];
 }
-interface Member { name: string; spent: string }
+interface Member { name: string; spent: string; contributed: string }
 
 const COLORS = ["#1f6f5c", "#2f9e79", "#57b894", "#8fd3b6", "#b8e2ce", "#d9efe3"];
+const toNum = (s: string) => Number(s.replace(/[£,]/g, ""));
 
 export default function ReportsPage() {
   const { current } = useHousehold();
@@ -37,25 +38,23 @@ export default function ReportsPage() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <div className="max-w-4xl"><div className="h-64 animate-pulse rounded-xl bg-[var(--border)]" /></div>;
-  if (!dash?.configured) return <div className="rounded-xl border bg-[var(--surface)] p-6 text-sm text-[var(--muted)]" style={{ borderColor: "var(--border)" }}>Set a budget to see reports.</div>;
+  if (!dash?.configured || !dash.balance) return <div className="rounded-xl border bg-[var(--surface)] p-6 text-sm text-[var(--muted)]" style={{ borderColor: "var(--border)" }}>Add some transactions to see reports.</div>;
 
   const catData = (dash.topCategories ?? [])
-    .filter((c) => c.totalMinor > 0)
-    .map((c) => ({ name: c.categoryId ? catNames[c.categoryId] ?? "Unknown" : "Uncategorised", value: c.totalMinor / 100 }));
+    .filter((c) => c.spentMinor > 0)
+    .map((c) => ({ name: c.categoryId ? catNames[c.categoryId] ?? "Unknown" : "Uncategorised", value: c.spentMinor / 100 }));
 
-  const memberData = members
-    .map((m) => ({ name: m.name, value: Number(m.spent.replace(/[£,]/g, "")) }))
-    .filter((m) => m.value > 0)
-    .sort((a, b) => b.value - a.value);
+  const spendData = members.map((m) => ({ name: m.name, value: toNum(m.spent) })).filter((m) => m.value > 0).sort((a, b) => b.value - a.value);
+  const contribData = members.map((m) => ({ name: m.name, value: toNum(m.contributed) })).filter((m) => m.value > 0).sort((a, b) => b.value - a.value);
 
   return (
     <div className="max-w-4xl space-y-6">
       <header><h1 className="text-xl font-semibold">Reports</h1></header>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Total budget" value={dash.budget!.total} />
-        <Stat label="Spent" value={dash.budget!.spent} />
-        <Stat label="Remaining" value={dash.budget!.remaining} />
+        <Stat label="Available balance" value={dash.balance.available} accent />
+        <Stat label="Total contributed" value={dash.balance.contributions} />
+        <Stat label="Total spent" value={dash.balance.expenses} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -73,14 +72,27 @@ export default function ReportsPage() {
           <Legend items={catData} />
         </Panel>
 
-        <Panel title="Spending by member">
-          {memberData.length === 0 ? <Empty /> : (
+        <Panel title="Contributions by member">
+          {contribData.length === 0 ? <Empty /> : (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={memberData} layout="vertical" margin={{ left: 10 }}>
+              <BarChart data={contribData} layout="vertical" margin={{ left: 10 }}>
                 <XAxis type="number" hide />
                 <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(v: number) => `£${v.toFixed(2)}`} />
                 <Bar dataKey="value" fill="var(--accent)" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Panel>
+
+        <Panel title="Spending by member">
+          {spendData.length === 0 ? <Empty /> : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={spendData} layout="vertical" margin={{ left: 10 }}>
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(v: number) => `£${v.toFixed(2)}`} />
+                <Bar dataKey="value" fill="#8fd3b6" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -90,22 +102,18 @@ export default function ReportsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div className="rounded-xl border bg-[var(--surface)] p-4" style={{ borderColor: "var(--border)" }}>
       <div className="text-xs uppercase tracking-wide text-[var(--muted)]">{label}</div>
-      <div className="tabular mt-1 text-2xl font-semibold">{value}</div>
+      <div className="tabular mt-1 text-2xl font-semibold" style={{ color: accent ? "var(--accent)" : "var(--ink)" }}>{value}</div>
     </div>
   );
 }
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl border bg-[var(--surface)] p-5" style={{ borderColor: "var(--border)" }}>
-      <h2 className="mb-3 text-base font-semibold">{title}</h2>{children}
-    </section>
-  );
+  return <section className="rounded-xl border bg-[var(--surface)] p-5" style={{ borderColor: "var(--border)" }}><h2 className="mb-3 text-base font-semibold">{title}</h2>{children}</section>;
 }
-function Empty() { return <div className="flex h-[260px] items-center justify-center text-sm text-[var(--muted)]">No spending yet.</div>; }
+function Empty() { return <div className="flex h-[260px] items-center justify-center text-sm text-[var(--muted)]">No data yet.</div>; }
 function Legend({ items }: { items: { name: string; value: number }[] }) {
   return (
     <ul className="mt-3 space-y-1 text-sm">
