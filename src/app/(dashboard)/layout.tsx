@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HouseholdProvider } from "@/lib/household-context";
+import MobileNav from "@/components/mobile-nav";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
@@ -37,14 +38,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <main className="px-4 py-6 md:px-8 md:py-8 pb-24 md:pb-8">{children}</main>
 
-      {/* Bottom nav (mobile) — Scan Receipt is prominent per spec */}
-      <nav className="fixed bottom-0 inset-x-0 md:hidden border-t bg-[var(--surface)] flex justify-around py-2"
-        style={{ borderColor: "var(--border)" }}>
-        <Link href="/dashboard" className="text-xs px-3 py-1">Home</Link>
-        <Link href="/expenses" className="text-xs px-3 py-1">Expenses</Link>
-        <Link href="/scan" className="text-xs px-3 py-1 font-semibold text-[var(--accent)]">Scan</Link>
-        <Link href="/assistant" className="text-xs px-3 py-1">Ask AI</Link>
-      </nav>
+      {/* Bottom nav (mobile) with a More sheet exposing every page */}
+      <MobileNav />
     </div>
     </HouseholdProvider>
   );
