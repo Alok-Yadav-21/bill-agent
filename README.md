@@ -101,4 +101,4 @@ for the milestone plan.
 
 **Alok Yadav** · AI/ML Engineer · MSc Data Science, Middlesex University London
 
-[Portfolio](https://alok-portfolio-lyart.vercel.app) · [LinkedIn](https://www.linkedin.com/in/yadavalokml) · [GitHub](https://github.com/Alok-Yadav-21)
+[Portfolio](https://alokyadav.live) · [LinkedIn](https://www.linkedin.com/in/yadavalokml) · [GitHub](https://github.com/Alok-Yadav-21)
