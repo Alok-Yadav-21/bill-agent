@@ -96,3 +96,9 @@ files, remaining UI pages (expenses table, scan, members, categories, reports,
 assistant chat), the internal `/api/internal/*` endpoints n8n calls, the
 remaining n8n workflow bodies, invitations, and CI. See `docs/architecture.md`
 for the milestone plan.
+
+## Author
+
+**Alok Yadav** · AI/ML Engineer · MSc Data Science, Middlesex University London
+
+[Portfolio](https://mathtodata.com) · [LinkedIn](https://www.linkedin.com/in/yadavalokml) · [GitHub](https://github.com/Alok-Yadav-21)
